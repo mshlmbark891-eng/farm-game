@@ -1,0 +1,174 @@
+
+extends Node
+
+signal money_changed(value: int)
+signal notification_requested(message: String)
+
+const SAVE_PATH := "user://farmlifear_save.json"
+
+var money: int = 2500
+var level: int = 1
+var experience: int = 0
+var day: int = 1
+var hour: float = 8.0
+
+var inventory: Dictionary = {
+    "wheat": 0,
+    "barley": 0,
+    "vegetables": 0,
+    "fruit": 0,
+    "milk": 0,
+    "eggs": 0,
+    "wool": 0,
+    "honey": 0,
+    "wood": 0,
+    "stone": 0,
+    "sand": 0,
+    "metal": 0,
+    "flour": 0,
+    "bread": 0,
+    "feed": 0
+}
+
+var owned_land: Array = ["starter_farm"]
+
+var owned_vehicles: Array = [
+    {
+        "id": "old_car",
+        "name": "سيارة قديمة",
+        "condition": 65,
+        "fuel": 70
+    }
+]
+
+var buildings: Array = []
+var crops: Array = []
+var animals: Array = []
+var workers: Array = []
+var factories: Array = []
+var contracts: Array = []
+var auctions: Array = []
+var roads: Array = []
+var security_assets: Array = []
+
+var quests: Dictionary = {
+    "first_harvest": false,
+    "first_sale": false,
+    "first_factory": false,
+    "first_transport_contract": false
+}
+
+var appearance: Dictionary = {
+    "shirt": "default",
+    "pants": "default",
+    "hair": "default"
+}
+
+var relationships: Dictionary = {}
+var business_reputation: Dictionary = {
+    "farm": 50,
+    "factory": 50,
+    "transport": 50,
+    "mining": 50
+}
+
+var financial_history: Array = []
+
+func add_money(amount: int) -> void:
+    if amount <= 0:
+        return
+    money += amount
+    money_changed.emit(money)
+
+func spend_money(amount: int) -> bool:
+    if amount < 0 or money < amount:
+        notification_requested.emit("الرصيد غير كافٍ")
+        return false
+
+    money -= amount
+    money_changed.emit(money)
+    return true
+
+func add_item(item_id: String, amount: int) -> void:
+    if amount <= 0:
+        return
+    inventory[item_id] = int(inventory.get(item_id, 0)) + amount
+
+func remove_item(item_id: String, amount: int) -> bool:
+    if amount <= 0:
+        return false
+
+    var current: int = int(inventory.get(item_id, 0))
+    if current < amount:
+        notification_requested.emit("الكمية غير كافية")
+        return false
+
+    inventory[item_id] = current - amount
+    return true
+
+func save_game() -> void:
+    var data := {
+        "money": money,
+        "level": level,
+        "experience": experience,
+        "day": day,
+        "hour": hour,
+        "inventory": inventory,
+        "owned_land": owned_land,
+        "owned_vehicles": owned_vehicles,
+        "buildings": buildings,
+        "crops": crops,
+        "animals": animals,
+        "workers": workers,
+        "factories": factories,
+        "contracts": contracts,
+        "auctions": auctions,
+        "roads": roads,
+        "security_assets": security_assets,
+        "quests": quests,
+        "appearance": appearance,
+        "relationships": relationships,
+        "business_reputation": business_reputation,
+        "financial_history": financial_history
+    }
+
+    var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    if file == null:
+        notification_requested.emit("تعذر حفظ اللعبة")
+        return
+
+    file.store_string(JSON.stringify(data))
+    file.close()
+    notification_requested.emit("تم حفظ اللعبة")
+
+func load_game() -> void:
+    if not FileAccess.file_exists(SAVE_PATH):
+        notification_requested.emit("لا يوجد حفظ سابق")
+        return
+
+    var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+    if file == null:
+        notification_requested.emit("تعذر فتح ملف الحفظ")
+        return
+
+    var data = JSON.parse_string(file.get_as_text())
+    file.close()
+
+    if typeof(data) != TYPE_DICTIONARY:
+        notification_requested.emit("ملف الحفظ غير صالح")
+        return
+
+    for key in data:
+        if key in [
+            "money", "level", "experience", "day", "hour",
+            "inventory", "owned_land", "owned_vehicles",
+            "buildings", "crops", "animals", "workers",
+            "factories", "contracts", "auctions", "roads",
+            "security_assets", "quests", "appearance",
+            "relationships", "business_reputation",
+            "financial_history"
+        ]:
+            set(key, data[key])
+
+    money_changed.emit(money)
+    notification_requested.emit("تم تحميل اللعبة")
